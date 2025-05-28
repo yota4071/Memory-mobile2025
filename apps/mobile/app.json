@@ -9,7 +9,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "このアプリは周辺の投稿を表示するために位置情報を使用します。",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "このアプリは周辺の投稿を表示するために位置情報を使用します。"
+      },
+      "config": {
+        "APIkey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +40,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-maps"
     ],
     "experiments": {
       "typedRoutes": true
