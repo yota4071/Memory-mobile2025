@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.tsx - Expo Maps対応版
+// src/screens/HomeScreen.tsx - EAS対応版
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, 
@@ -15,6 +15,7 @@ import {
 // 🗺️ Expo用のマップコンポーネント
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 
 // グローバルスタイルをインポート
@@ -27,6 +28,51 @@ import {
   Shadows,
   StyleUtils 
 } from '../styles/GlobalStyles';
+
+// 🔧 環境変数から設定を取得
+const getConfigValue = (key: string, defaultValue: string = ''): string => {
+  // EAS Build時はConstants.expoConfig.extraから取得
+  const expoConfigValue = Constants.expoConfig?.extra?.[key];
+  if (expoConfigValue) {
+    return expoConfigValue;
+  }
+  
+  // 開発時はprocess.envから取得
+  if (typeof process !== 'undefined' && process.env) {
+    const envValue = process.env[`EXPO_PUBLIC_${key.toUpperCase()}`];
+    if (envValue) {
+      return envValue;
+    }
+  }
+  
+  return defaultValue;
+};
+
+// 🌍 アプリ設定
+const AppConfig = {
+  googleMapsApiKey: getConfigValue('googleMapsApiKey'),
+  apiBaseUrl: getConfigValue('apiBaseUrl', 'http://localhost:3000'),
+  environment: getConfigValue('environment', 'development'),
+  debugMode: getConfigValue('debugMode', 'false') === 'true',
+};
+
+// 🚨 開発時のAPIキー確認
+if (__DEV__ && !AppConfig.googleMapsApiKey) {
+  console.warn(
+    '⚠️ Google Maps APIキーが設定されていません。\n' +
+    '.envファイルでEXPO_PUBLIC_GOOGLE_MAPS_API_KEYを設定してください。'
+  );
+}
+
+// デバッグログ出力
+if (AppConfig.debugMode) {
+  console.log('🔧 App Config:', {
+    hasApiKey: !!AppConfig.googleMapsApiKey,
+    apiBaseUrl: AppConfig.apiBaseUrl,
+    environment: AppConfig.environment,
+    platform: Platform.OS,
+  });
+}
 
 // 投稿データの型定義
 interface Post {
@@ -94,22 +140,40 @@ export default function HomeScreen() {
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLocationPermission, setHasLocationPermission] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
-    requestLocationPermission();
+    initializeApp();
   }, []);
+
+  // 🚀 アプリ初期化
+  const initializeApp = async () => {
+    try {
+      if (AppConfig.debugMode) {
+        console.log('🚀 アプリを初期化中...');
+      }
+      
+      await requestLocationPermission();
+    } catch (error) {
+      console.error('アプリ初期化エラー:', error);
+      setError('アプリの初期化に失敗しました');
+      setIsLoading(false);
+    }
+  };
 
   // 🔐 位置情報の権限を要求
   const requestLocationPermission = async () => {
     try {
-      console.log('位置情報の権限を要求中...');
+      if (AppConfig.debugMode) {
+        console.log('🔐 位置情報の権限を要求中...');
+      }
       
       // Expo Location を使用して権限を要求
       let { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        console.log('位置情報の権限が拒否されました');
+        console.log('❌ 位置情報の権限が拒否されました');
         Alert.alert(
           '位置情報の権限が必要です',
           'このアプリでは周辺の投稿を表示するために位置情報が必要です。設定から位置情報を許可してください。',
@@ -133,12 +197,15 @@ export default function HomeScreen() {
         return;
       }
 
-      console.log('位置情報の権限が許可されました');
+      if (AppConfig.debugMode) {
+        console.log('✅ 位置情報の権限が許可されました');
+      }
+      
       setHasLocationPermission(true);
       await getCurrentLocation();
       
     } catch (error) {
-      console.error('権限要求エラー:', error);
+      console.error('❌ 権限要求エラー:', error);
       Alert.alert('エラー', '位置情報の権限取得に失敗しました。デフォルト位置を使用します。');
       setUserLocation({
         latitude: 35.6812,
@@ -151,14 +218,19 @@ export default function HomeScreen() {
   // 📍 現在位置を取得
   const getCurrentLocation = async () => {
     try {
-      console.log('現在位置を取得中...');
+      if (AppConfig.debugMode) {
+        console.log('📍 現在位置を取得中...');
+      }
       
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
         timeInterval: 5000,
+        distanceInterval: 10,
       });
       
-      console.log('位置情報取得成功:', location.coords);
+      if (AppConfig.debugMode) {
+        console.log('✅ 位置情報取得成功:', location.coords);
+      }
       
       setUserLocation({
         latitude: location.coords.latitude,
@@ -167,7 +239,7 @@ export default function HomeScreen() {
       setIsLoading(false);
       
     } catch (error) {
-      console.error('現在位置取得エラー:', error);
+      console.error('❌ 現在位置取得エラー:', error);
       Alert.alert(
         '位置情報取得エラー',
         'デフォルト位置（東京駅）を使用します。GPS設定を確認してください。',
@@ -186,6 +258,8 @@ export default function HomeScreen() {
   // 🔄 位置情報を再取得
   const refreshLocation = async () => {
     setIsLoading(true);
+    setError(null);
+    
     if (hasLocationPermission) {
       await getCurrentLocation();
     } else {
@@ -202,6 +276,29 @@ export default function HomeScreen() {
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       }, 1000);
+    }
+  };
+
+  // 📲 投稿を取得（将来的にAPIから取得）
+  const fetchPosts = async () => {
+    try {
+      if (AppConfig.debugMode) {
+        console.log('📲 投稿を取得中...', AppConfig.apiBaseUrl);
+      }
+      
+      // 将来的にはAPIから取得
+      // const response = await fetch(`${AppConfig.apiBaseUrl}/api/posts/nearby`);
+      // const data = await response.json();
+      // setPosts(data);
+      
+      // 現在はサンプルデータを使用
+      setPosts(samplePosts);
+      
+    } catch (error) {
+      console.error('投稿取得エラー:', error);
+      if (AppConfig.debugMode) {
+        Alert.alert('デバッグ', `投稿取得エラー: ${error}`);
+      }
     }
   };
 
@@ -264,6 +361,32 @@ export default function HomeScreen() {
         <Text style={GlobalStyles.loadingText}>
           {hasLocationPermission ? '位置情報を取得中...' : '権限を確認中...'}
         </Text>
+        {AppConfig.debugMode && (
+          <Text style={[GlobalStyles.textCaption, StyleUtils.marginVertical('sm')]}>
+            環境: {AppConfig.environment}
+          </Text>
+        )}
+      </View>
+    );
+  }
+
+  // ❌ エラー画面
+  if (error) {
+    return (
+      <View style={GlobalStyles.centerContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
+        <Text style={[GlobalStyles.textHeading, StyleUtils.textColor('error')]}>
+          エラーが発生しました
+        </Text>
+        <Text style={[GlobalStyles.textBody, StyleUtils.marginVertical('sm')]}>
+          {error}
+        </Text>
+        <TouchableOpacity 
+          style={[GlobalStyles.buttonPrimary, StyleUtils.marginVertical('md')]}
+          onPress={initializeApp}
+        >
+          <Text style={GlobalStyles.buttonTextPrimary}>再試行</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -272,7 +395,14 @@ export default function HomeScreen() {
     <View style={GlobalStyles.container}>
       {/* 📱 ヘッダー */}
       <View style={GlobalStyles.header}>
-        <Text style={GlobalStyles.headerTitle}>Balloon</Text>
+        <Text style={GlobalStyles.headerTitle}>
+          Balloon
+          {AppConfig.debugMode && (
+            <Text style={[GlobalStyles.textCaption, { color: Colors.warning }]}>
+              {' '}({AppConfig.environment})
+            </Text>
+          )}
+        </Text>
         <TouchableOpacity style={styles.headerButton}>
           <Ionicons name="add-circle-outline" size={28} color={Colors.primary} />
         </TouchableOpacity>
@@ -294,6 +424,11 @@ export default function HomeScreen() {
             showsMyLocationButton={false}
             showsCompass={true}
             showsScale={true}
+            onMapReady={() => {
+              if (AppConfig.debugMode) {
+                console.log('🗺️ マップの準備が完了しました');
+              }
+            }}
           >
             {/* 📍 ユーザーの現在位置マーカー（権限がない場合のみ表示） */}
             {!hasLocationPermission && (
@@ -315,7 +450,11 @@ export default function HomeScreen() {
                 }}
                 title={post.username}
                 description={post.content.substring(0, 50) + '...'}
-                onPress={() => console.log(`投稿 ${post.id} がタップされました`)}
+                onPress={() => {
+                  if (AppConfig.debugMode) {
+                    console.log(`📍 投稿 ${post.id} がタップされました`);
+                  }
+                }}
               >
                 <View style={styles.customMarker}>
                   <Image 
@@ -368,7 +507,10 @@ export default function HomeScreen() {
             <TouchableOpacity style={styles.headerActionButton}>
               <Ionicons name="filter" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerActionButton}>
+            <TouchableOpacity 
+              style={styles.headerActionButton}
+              onPress={fetchPosts}
+            >
               <Ionicons name="refresh" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
