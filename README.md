@@ -45,6 +45,19 @@ npx expo install expo-location react-native-maps
 
 map用のライブラリインストールしてね💛
 
+
+# 自動的にtag(バックアップ)を作ってpushしてくれるコード
+### windows用
+project rootの`tagmakeforwindows.bat`
+```bash
+ .\tagmakeforwindows.bat
+```
+
+### Mac用
+project rootの`tag_create_for_Mac.sh`
+
+
+
 # grobalなcss(ts)の場所
 基本的にreact nativeではcssは使えないのでそれ用のtsを用意しました。**apps/mobile/src/styles**に入っています
 
