@@ -22,3 +22,5 @@ npm run dev
 mobileの中で
 
 npm run start
+
+↑windowsの場合、Windows Defenderによるブロックがされていないか要確認
