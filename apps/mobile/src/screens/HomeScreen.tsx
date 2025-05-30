@@ -142,6 +142,18 @@ export default function HomeScreen() {
   const [hasLocationPermission, setHasLocationPermission] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
+  const checkApiHealth = async () => {
+    try {
+      const res = await fetch(`${AppConfig.apiBaseUrl}/health`);
+      const data = await res.json();
+      if (AppConfig.debugMode) {
+        console.log('✅ APIヘルスチェック成功:', data);
+      }
+    } catch (err) {
+      console.error('❌ APIヘルスチェック失敗:', err);
+      Alert.alert('API接続エラー', 'バックエンドサーバーが起動していない可能性があります。');
+    }
+  };
 
   useEffect(() => {
     initializeApp();
@@ -153,7 +165,8 @@ export default function HomeScreen() {
       if (AppConfig.debugMode) {
         console.log('🚀 アプリを初期化中...');
       }
-      
+
+      await checkApiHealth();
       await requestLocationPermission();
     } catch (error) {
       console.error('アプリ初期化エラー:', error);
@@ -161,6 +174,20 @@ export default function HomeScreen() {
       setIsLoading(false);
     }
   };
+  useEffect(() => {
+    const checkApi = async () => {
+      try {
+        const res = await fetch(`${AppConfig.apiBaseUrl}/health`);
+        const data = await res.json();
+        if (AppConfig.debugMode) {
+          Alert.alert('✅ API 通信成功', `status: ${data.status}`);
+        }
+      } catch (err) {
+        Alert.alert('❌ API通信失敗', 'バックエンドサーバーが落ちている可能性があります。');
+      }
+    };
+    checkApi();
+  }, []);
 
   // 🔐 位置情報の権限を要求
   const requestLocationPermission = async () => {
