@@ -1,5 +1,5 @@
 // src/screens/ExploreScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; // useEffectをインポート (将来的なAPI連携用)
 import {
   View,
   Text,
@@ -8,8 +8,9 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  ActivityIndicator,
-  RefreshControl,
+  SafeAreaView,
+  Dimensions,
+  ActivityIndicator, // ローディング表示用
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -18,421 +19,320 @@ import {
   Spacing,
   Typography,
   BorderRadius,
-  Shadows,
-  StyleUtils
 } from '../styles/GlobalStyles';
 
-// 探索カテゴリの型定義
-interface ExploreCategory {
+// --- 型定義 ---
+interface TagCategory {
   id: string;
-  title: string;
-  icon: string;
-  color: string;
-  count: number;
+  name: string;
 }
 
-// トレンド投稿の型定義
-interface TrendingPost {
+interface RecommendedContent {
   id: string;
-  username: string;
-  content: string;
-  timestamp: string;
-  likes: number;
-  comments: number;
-  location: string;
-  avatar?: string;
-  image?: string;
+  imageUrl: string;
+  // 将来的に検索対象となるプロパティ (例: title, description) を追加
+  title?: string; // サンプルとして追加
 }
 
-// 探索カテゴリのサンプルデータ
-const exploreCategories: ExploreCategory[] = [
-  {
-    id: '1',
-    title: 'グルメ',
-    icon: 'restaurant',
-    color: '#FF6B6B',
-    count: 1247
-  },
-  {
-    id: '2',
-    title: 'イベント',
-    icon: 'calendar',
-    color: '#4ECDC4',
-    count: 892
-  },
-  {
-    id: '3',
-    title: '観光',
-    icon: 'camera',
-    color: '#45B7D1',
-    count: 634
-  },
-  {
-    id: '4',
-    title: 'ショッピング',
-    icon: 'bag',
-    color: '#96CEB4',
-    count: 523
-  },
-  {
-    id: '5',
-    title: 'アート',
-    icon: 'color-palette',
-    color: '#FECA57',
-    count: 389
-  },
-  {
-    id: '6',
-    title: '自然',
-    icon: 'leaf',
-    color: '#48CAE4',
-    count: 756
-  }
+// --- サンプルデータ ---
+const sampleTags: TagCategory[] = [
+  { id: 'tag1', name: '#風景' },
+  { id: 'tag2', name: '#イラスト' },
+  { id: 'tag3', name: '#猫' },
+  { id: 'tag4', name: '#ポートレート' },
+  { id: 'tag5', name: '#食べ物' },
+  { id: 'tag6', name: '#旅行' },
+  { id: 'tag7', name: '#アート' },
 ];
 
-// トレンド投稿のサンプルデータ
-const trendingPosts: TrendingPost[] = [
-  {
-    id: '1',
-    username: 'TokyoFoodie',
-    content: '新宿で見つけた隠れ家ラーメン店。スープが絶品です！',
-    timestamp: '1時間前',
-    likes: 156,
-    comments: 23,
-    location: '新宿区',
-    avatar: 'https://i.pravatar.cc/50?img=6',
-    image: 'https://picsum.photos/300/200?random=1'
-  },
-  {
-    id: '2',
-    username: 'ArtLover_Shibuya',
-    content: '渋谷の新しいアート展示がすごい！現代アートの新しい形を見ることができました。',
-    timestamp: '2時間前',
-    likes: 89,
-    comments: 12,
-    location: '渋谷区',
-    avatar: 'https://i.pravatar.cc/50?img=7',
-    image: 'https://picsum.photos/300/200?random=2'
-  },
-  {
-    id: '3',
-    username: 'NatureWalker',
-    content: '上野公園の桜が見頃です。朝の散歩で撮影しました。',
-    timestamp: '3時間前',
-    likes: 234,
-    comments: 45,
-    location: '台東区',
-    avatar: 'https://i.pravatar.cc/50?img=8',
-    image: 'https://picsum.photos/300/200?random=3'
-  }
+// サンプルデータに検索対象となりうるtitleプロパティを追加
+const sampleRecommendedContentData: RecommendedContent[] = [
+  { id: 'content1', imageUrl: 'https://picsum.photos/seed/main_large_v12/800/600', title: '雄大な橋と霧の風景' },
+  { id: 'content2', imageUrl: 'https://picsum.photos/seed/grid_v12_1/300/300', title: '夕焼け空と雲' },
+  { id: 'content3', imageUrl: 'https://picsum.photos/seed/grid_v12_2/300/300', title: 'モノクロの山並み' },
+  { id: 'content4', imageUrl: 'https://picsum.photos/seed/grid_v12_3/300/300', title: '岩と空' },
+  { id: 'content5', imageUrl: 'https://picsum.photos/seed/grid_v12_4/300/300', title: '森の中の光' },
+  { id: 'content6', imageUrl: 'https://picsum.photos/seed/grid_v12_5/300/300', title: 'チューリップ畑' },
+  { id: 'content7', imageUrl: 'https://picsum.photos/seed/grid_v12_6/300/300', title: '田園風景の小屋' },
+  { id: 'content8', imageUrl: 'https://picsum.photos/seed/grid_v12_7/300/300', title: '月夜の砂漠' },
+  { id: 'content9', imageUrl: 'https://picsum.photos/seed/grid_v12_8/300/300', title: '公園のベンチと紅葉' },
+  { id: 'content10', imageUrl: 'https://picsum.photos/seed/grid_v12_9/300/300', title: '春の芽生え' },
 ];
+
+const { width: screenWidth } = Dimensions.get('window');
+const NUM_COLUMNS = 3;
+const SCREEN_HORIZONTAL_PADDING = Spacing.md;
+const GRID_ITEM_HORIZONTAL_GAP = Spacing.xs;
+const GRID_ITEM_VERTICAL_GAP = Spacing.xs;
+
+const GRID_ITEM_WIDTH = (screenWidth - (SCREEN_HORIZONTAL_PADDING * 2) - (GRID_ITEM_HORIZONTAL_GAP * (NUM_COLUMNS - 1))) / NUM_COLUMNS;
 
 export default function ExploreScreen() {
   const [searchText, setSearchText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [posts, setPosts] = useState<TrendingPost[]>(trendingPosts);
-  const [isLoading, setIsLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  // 表示用データ。大きなアイテムは別途 largeContentItem で扱う
+  const [displayedGridPosts, setDisplayedGridPosts] = useState<RecommendedContent[]>(sampleRecommendedContentData.slice(1));
+  const [isSearching, setIsSearching] = useState(false); // フロントエンド検索中のローディング用
 
-  // 検索処理
-  const handleSearch = (text: string) => {
-    setSearchText(text);
-    // 実際のアプリでは、ここでAPIを呼び出して検索結果を取得
-    console.log('検索:', text);
+  // --- イベントハンドラ ---
+  const handleMapIconPress = () => {
+    console.log('[TODO] マップアイコンタップ: 地図探索画面へ遷移');
+    // router.push('/explore/map');
   };
 
-  // カテゴリ選択処理
-  const handleCategorySelect = (categoryId: string) => {
-    if (selectedCategory === categoryId) {
-      setSelectedCategory(null);
-    } else {
-      setSelectedCategory(categoryId);
+  const handleTagPress = (tag: TagCategory) => {
+    console.log(`[TODO] タグ 「${tag.name}」 タップ: タグ別コンテンツ一覧画面へ遷移`);
+    // router.push(`/explore/tag/${tag.id}`);
+  };
+
+  const handleContentPress = (content: RecommendedContent, isLargeItem: boolean = false) => {
+    console.log(`[TODO] コンテンツID 「${content.id}」 (${isLargeItem ? '大' : '小'}) タップ: 詳細画面へ遷移`);
+    // router.push(`/content/${content.id}`);
+  };
+
+  // --- フロントエンド検索ロジック ---
+  const performSearch = (query: string) => {
+    const trimmedQuery = query.trim().toLowerCase();
+    setIsSearching(true);
+
+    if (!trimmedQuery) {
+      setDisplayedGridPosts(sampleRecommendedContentData.slice(1)); // クエリが空なら初期グリッドデータに戻す
+      setIsSearching(false);
+      return;
     }
-    // 実際のアプリでは、カテゴリに基づいて投稿をフィルタリング
-    console.log('選択されたカテゴリ:', categoryId);
+
+    // TODO (P1): より高度な検索ロジックを実装する
+    // - 複数キーワード対応 (AND/OR)
+    // - 検索対象プロパティの拡充 (現状は title のみ。将来的には説明文、ユーザー名など)
+    // - API連携の場合は、API側で検索処理を行う
+    console.log(`[TODO] フロントエンド検索実行: "${trimmedQuery}"`);
+    const filteredPosts = sampleRecommendedContentData.slice(1).filter(post =>
+      post.title?.toLowerCase().includes(trimmedQuery) || // タイトルで検索
+      post.imageUrl.toLowerCase().includes(trimmedQuery)  // 画像URLでも一応検索 (デモ用)
+    );
+    setDisplayedGridPosts(filteredPosts);
+
+    // 実際のAPI検索の場合は非同期になるため、適切なタイミングで setIsSearching(false) する
+    setTimeout(() => setIsSearching(false), 500); // ダミーの遅延
   };
 
-  // 投稿の更新処理
-  const onRefresh = async () => {
-    setRefreshing(true);
-    // 実際のアプリでは、最新の投稿を取得
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+  const handleSubmitSearch = () => {
+    performSearch(searchText);
   };
 
-  // カテゴリアイテムの描画
-  const renderCategory = ({ item }: { item: ExploreCategory }) => (
+
+  // --- レンダー関数 ---
+  const renderTagItem = ({ item }: { item: TagCategory }) => (
     <TouchableOpacity
-      style={[
-        styles.categoryItem,
-        selectedCategory === item.id && styles.categoryItemSelected,
-        { borderColor: item.color }
-      ]}
-      onPress={() => handleCategorySelect(item.id)}
+      style={styles.tagItem}
+      onPress={() => handleTagPress(item)}
     >
-      <View style={[styles.categoryIcon, { backgroundColor: item.color }]}>
-        <Ionicons name={item.icon as any} size={20} color="white" />
-      </View>
-      <Text style={[
-        GlobalStyles.textCaption,
-        selectedCategory === item.id && styles.categoryTextSelected
-      ]}>
-        {item.title}
-      </Text>
-      <Text style={[GlobalStyles.textCaption, { color: Colors.textTertiary }]}>
-        {item.count}
-      </Text>
+      <Text style={[GlobalStyles.textCaption, styles.tagTextOverride]}>{item.name}</Text>
     </TouchableOpacity>
   );
 
-  // トレンド投稿アイテムの描画
-  const renderTrendingPost = ({ item }: { item: TrendingPost }) => (
-    <TouchableOpacity style={[GlobalStyles.card, styles.trendingPost]}>
-      <View style={styles.postHeader}>
-        <Image
-          source={{ uri: item.avatar || 'https://i.pravatar.cc/50?img=9' }}
-          style={GlobalStyles.avatar}
-        />
-        <View style={styles.postInfo}>
-          <Text style={[GlobalStyles.textBody, { fontWeight: '600' }]}>
-            {item.username}
-          </Text>
-          <Text style={[GlobalStyles.textCaption, { color: Colors.textSecondary }]}>
-            {item.location} • {item.timestamp}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={Colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={[GlobalStyles.textBody, StyleUtils.marginVertical('sm')]}>
-        {item.content}
-      </Text>
-
-      {item.image && (
-        <Image source={{ uri: item.image }} style={styles.postImage} />
-      )}
-
-      <View style={styles.postActions}>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="heart-outline" size={20} color={Colors.textSecondary} />
-          <Text style={[GlobalStyles.textCaption, StyleUtils.marginHorizontal('xs')]}>
-            {item.likes}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
-          <Text style={[GlobalStyles.textCaption, StyleUtils.marginHorizontal('xs')]}>
-            {item.comments}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="share-outline" size={20} color={Colors.textSecondary} />
-          <Text style={[GlobalStyles.textCaption, StyleUtils.marginHorizontal('xs')]}>
-            シェア
-          </Text>
-        </TouchableOpacity>
-      </View>
+  const renderGridContentItem = ({ item }: { item: RecommendedContent }) => (
+    <TouchableOpacity
+      style={styles.gridItem}
+      onPress={() => handleContentPress(item)}
+    >
+      <Image source={{ uri: item.imageUrl }} style={styles.gridItemImage} />
     </TouchableOpacity>
   );
+
+  const largeContentItem = sampleRecommendedContentData[0];
 
   return (
-    <View style={GlobalStyles.container}>
-      {/* ヘッダー */}
-      <View style={GlobalStyles.header}>
-        <Text style={GlobalStyles.headerTitle}>探索</Text>
-        <TouchableOpacity style={styles.headerButton}>
-          <Ionicons name="filter" size={24} color={Colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* 検索バー */}
-      <View style={[StyleUtils.backgroundColor('surface'), StyleUtils.paddingHorizontal('md')]}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.searchBarArea}>
+        <View style={styles.searchBarInputContainer}>
+          <Ionicons name="search" size={Typography.fontSize.lg} color={Colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="場所やキーワードで検索..."
-            placeholderTextColor={Colors.textSecondary}
+            placeholder="キーワードを検索" // プレースホルダー変更
+            placeholderTextColor={Colors.textTertiary} // より薄いプレースホルダー色
             value={searchText}
-            onChangeText={handleSearch}
+            onChangeText={setSearchText}
+            onSubmitEditing={handleSubmitSearch}
+            returnKeyType="search"
+            clearButtonMode="while-editing" // iOSでクリアボタン表示
           />
-          {searchText.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchText('')}
-              style={styles.clearButton}
-            >
-              <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          )}
         </View>
+        <TouchableOpacity onPress={handleMapIconPress} style={styles.mapIconContainer}>
+          <Ionicons name="map-outline" size={Typography.fontSize.xxl} color={Colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
         ListHeaderComponent={
-          <View>
-            {/* カテゴリセクション */}
-            <View style={StyleUtils.paddingVertical('md')}>
-              <Text style={[
-                GlobalStyles.textHeading,
-                StyleUtils.paddingHorizontal('md'),
-                StyleUtils.marginVertical('sm')
-              ]}>
-                カテゴリ
-              </Text>
+          <>
+            <View style={styles.tagsArea}>
               <FlatList
-                data={exploreCategories}
+                data={sampleTags}
+                renderItem={renderTagItem}
                 keyExtractor={(item) => item.id}
-                renderItem={renderCategory}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={StyleUtils.paddingHorizontal('sm')}
+                contentContainerStyle={styles.tagsListContainer}
               />
             </View>
 
-            {/* トレンドセクション */}
-            <View style={StyleUtils.paddingVertical('sm')}>
-              <Text style={[
-                GlobalStyles.textHeading,
-                StyleUtils.paddingHorizontal('md'),
-                StyleUtils.marginVertical('sm')
-              ]}>
-                トレンド投稿
-              </Text>
-            </View>
-          </View>
-        }
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderTrendingPost}
-        contentContainerStyle={{ paddingBottom: Spacing.xl }}
-      />
+            {largeContentItem && (
+              <View style={styles.largeItemContainer}>
+                <TouchableOpacity
+                  style={styles.largeItem}
+                  onPress={() => handleContentPress(largeContentItem, true)}
+                >
+                  <Image source={{ uri: largeContentItem.imageUrl }} style={styles.largeItemImage} />
+                </TouchableOpacity>
+              </View>
+            )}
 
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      )}
-    </View>
+            {/* 検索中のローディング表示または結果なし表示 */}
+            {isSearching && (
+              <View style={styles.feedbackContainer}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={[GlobalStyles.textCaption, styles.feedbackText]}>検索中...</Text>
+              </View>
+            )}
+            {!isSearching && searchText.trim() !== '' && displayedGridPosts.length === 0 && (
+              <View style={styles.feedbackContainer}>
+                <Text style={[GlobalStyles.textBody, styles.feedbackText]}>
+                  「{searchText}」に一致する結果は見つかりませんでした。
+                </Text>
+              </View>
+            )}
+          </>
+        }
+        data={displayedGridPosts}
+        renderItem={renderGridContentItem}
+        keyExtractor={(item) => item.id}
+        numColumns={NUM_COLUMNS}
+        style={styles.contentGridStyle}
+        contentContainerStyle={styles.contentGridContainerStyle}
+        columnWrapperStyle={styles.rowStyle}
+        showsVerticalScrollIndicator={false}
+        // keyboardDismissMode="on-drag" // スクロールでキーボードを閉じる
+        // keyboardShouldPersistTaps="handled" // TextInput以外をタップでキーボードを閉じる
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerButton: {
-    padding: Spacing.xs,
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.background,
   },
-
-  searchContainer: {
+  searchBarArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1, // デザインに応じて区切り線を追加
+    borderBottomColor: Colors.divider,
+  },
+  searchBarInputContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.background,
     borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    marginVertical: Spacing.sm,
-    ...Shadows.small,
+    paddingHorizontal: Spacing.sm,
+    height: 40,
   },
-
   searchIcon: {
-    marginRight: Spacing.sm,
+    marginRight: Spacing.xs, // 少し詰める
   },
-
   searchInput: {
     flex: 1,
     fontSize: Typography.fontSize.md,
     color: Colors.textPrimary,
+    paddingVertical: Spacing.xs, // iOSでの入力フィールドの高さ調整
   },
-
-  clearButton: {
-    padding: Spacing.xs,
-  },
-
-  categoryItem: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginHorizontal: Spacing.xs,
-    minWidth: 80,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    ...Shadows.small,
-  },
-
-  categoryItemSelected: {
-    backgroundColor: Colors.primaryLight + '20',
-  },
-
-  categoryIcon: {
-    width: 40,
+  mapIconContainer: {
+    paddingLeft: Spacing.sm,
     height: 40,
-    borderRadius: BorderRadius.round,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.xs,
-  },
-
-  categoryTextSelected: {
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-
-  trendingPost: {
-    marginHorizontal: Spacing.md,
-    marginVertical: Spacing.xs,
-  },
-
-  postHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    width: 40,
   },
-
-  postInfo: {
-    flex: 1,
-    marginLeft: Spacing.sm,
-  },
-
-  moreButton: {
-    padding: Spacing.xs,
-  },
-
-  postImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: BorderRadius.md,
-    marginVertical: Spacing.sm,
-  },
-
-  postActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  tagsArea: {
     paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    marginTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1, // デザインに応じて区切り線を追加
+    borderBottomColor: Colors.divider,
   },
-
-  actionButton: {
-    flexDirection: 'row',
+  tagsListContainer: {
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING,
+    paddingVertical: Spacing.xs,
+  },
+  tagItem: {
+    backgroundColor: 'rgba(51, 153, 255, 0.1)', // Colors.primaryLight + '20' の代替 (GlobalStylesに定義推奨)
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.xs, // 少し小さく
+    paddingHorizontal: Spacing.md,
+    marginRight: Spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(102, 179, 255, 0.3)', // Colors.primaryLight + '50' の代替 (GlobalStylesに定義推奨)
+  },
+  tagTextOverride: { // GlobalStyles.textCaption をベースに
+    color: Colors.primary, // 色を少し明るく
+    fontWeight: Typography.fontWeight.medium,
+  },
+  largeItemContainer: {
+    marginBottom: Spacing.md, // 下のグリッドとの間隔
+    // paddingHorizontal: SCREEN_HORIZONTAL_PADDING, // FlatListのcontentContainerStyleで制御するため不要
+    // backgroundColor: Colors.background, // FlatListの背景に合わせる
+  },
+  largeItem: {
+    width: screenWidth - SCREEN_HORIZONTAL_PADDING * 2, // 画面左右パディングを考慮
+    height: screenWidth * 0.75, // 少し高さを出す (正方形に近い大きな画像に)
+    alignSelf: 'center', // 中央寄せ
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: Colors.divider,
+  },
+  largeItemImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  contentGridStyle: {
+    flex: 1,
+  },
+  contentGridContainerStyle: {
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING,
+    paddingBottom: Spacing.lg,
+  },
+  rowStyle: {
+    justifyContent: 'space-between',
+    marginBottom: GRID_ITEM_VERTICAL_GAP,
+  },
+  gridItem: {
+    width: GRID_ITEM_WIDTH,
+    aspectRatio: 1,
+    backgroundColor: Colors.divider,
+    borderRadius: BorderRadius.sm,
+    overflow: 'hidden',
+    // marginRight は不要 (columnWrapperStyleのjustifyContentで調整)
+    // marginBottom は rowStyle で設定
+  },
+  gridItemImage: {
+    flex: 1,
+    resizeMode: 'cover',
+  },
+  // --- フィードバック表示用スタイル ---
+  feedbackContainer: {
+    paddingVertical: Spacing.xl,
     alignItems: 'center',
-    padding: Spacing.xs,
-  },
-
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     justifyContent: 'center',
-    alignItems: 'center',
+    minHeight: 100, // ある程度の高さを確保
+  },
+  feedbackText: {
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.lg,
   },
 });
