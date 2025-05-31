@@ -277,13 +277,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(102, 179, 255, 0.3)', // Colors.primaryLight + '50' の代替 (GlobalStylesに定義推奨)
   },
-  tagTextOverride: { // GlobalStyles.textCaption をベースに
-    color: Colors.primary, // 色を少し明るく
+  tagTextOverride: {
+    // color: Colors.primary, // 現在の設定 (以前は Colors.primaryDark だったかもしれません)
+    color: Colors.primaryDark, // ★ ここを GlobalStyles.Colors.primary にする (ご要望に応じて primaryDark なども検討)
     fontWeight: Typography.fontWeight.medium,
+    // fontSize は GlobalStyles.textCaption から継承
   },
   largeItemContainer: {
-    marginBottom: Spacing.md, // 下のグリッドとの間隔
-    // paddingHorizontal: SCREEN_HORIZONTAL_PADDING, // FlatListのcontentContainerStyleで制御するため不要
+    // marginBottom: Spacing.md, // 下のグリッドとの間隔
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING,
+    backgroundColor: Colors.background,
     // backgroundColor: Colors.background, // FlatListの背景に合わせる
   },
   largeItem: {
@@ -308,7 +311,7 @@ const styles = StyleSheet.create({
   },
   rowStyle: {
     justifyContent: 'space-between',
-    marginBottom: GRID_ITEM_VERTICAL_GAP,
+    marginTop: GRID_ITEM_VERTICAL_GAP
   },
   gridItem: {
     width: GRID_ITEM_WIDTH,
