@@ -1,15 +1,21 @@
-import http from 'http';
+// src/index.ts
+import express from 'express';
+import serverless from 'serverless-http';
 
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok' }));
-  } else {
-    res.writeHead(404);
-    res.end();
-  }
+const app = express();
+
+// JSONリクエストを扱えるようにする
+app.use(express.json());
+
+// ヘルスチェック用のエンドポイント
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
-server.listen(3001, () => {
-  console.log('API server listening on http://localhost:3001');
+// 他にもエンドポイントを追加できます
+app.get('/hello', (req, res) => {
+  res.json({ message: 'Hello from Lambda + Express!' });
 });
+
+// Lambda 用にエクスポート
+export const handler = serverless(app);
