@@ -269,14 +269,14 @@ export default function HomeScreen() {
       console.error('❌ 現在位置取得エラー:', error);
       Alert.alert(
         '位置情報取得エラー',
-        'デフォルト位置（東京駅）を使用します。GPS設定を確認してください。',
+        'デフォルト位置（茨木駅）を使用します。GPS設定を確認してください。',
         [{ text: 'OK' }]
       );
       
       // デフォルト位置（東京駅）
       setUserLocation({
-        latitude: 35.6812,
-        longitude: 139.7671
+        latitude: 34.815206,
+        longitude: 135.562543
       });
       setIsLoading(false);
     }
