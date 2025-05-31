@@ -8,7 +8,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ==========================================
 export const Colors = {
   // ✅ プライマリカラー（アプリのメインカラー）
-  primary: '#3399FF',        // メインブルー
+  primary: '#111111',        // メインブルー
   primaryDark: '#2280E6',    // 濃いブルー（ボタン押下時など）
   primaryLight: '#66B3FF',   // 薄いブルー（背景など）
   
