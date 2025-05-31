@@ -1,28 +1,9 @@
 service: memory-api
 
-
 provider:
   name: aws
-  runtime: nodejs20.x
+  runtime: nodejs18.x
   region: ap-northeast-1
-  architecture: arm64
-  memorySize: 128
-  timeout: 10
-  environment:
-    NODE_ENV: production
-
-functions:
-  api:
-    handler: dist/index.handler  # ← dist に変更
-    events:
-      - httpApi: '*'             # ← http → httpApi に変更
-
-package:
-  patterns:
-    - dist/**
-    - node_modules/**            # ← 必須ライブラリは含める
-    - '!**/*.test.ts'
-    - '!src/**'                  # ← src は含めない
 
 plugins:
   - serverless-offline
@@ -30,3 +11,11 @@ plugins:
 custom:
   serverless-offline:
     httpPort: 3001
+
+functions:
+  api:
+    handler: src/index.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: any

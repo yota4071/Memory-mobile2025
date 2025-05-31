@@ -1,21 +1,20 @@
 // src/index.ts
 import express from 'express';
 import serverless from 'serverless-http';
+import accountRoutes from './routes/account';
 
 const app = express();
 
-// JSONリクエストを扱えるようにする
+// JSON リクエストをパース
 app.use(express.json());
 
-// ヘルスチェック用のエンドポイント
-app.get('/health', (req, res) => {
+// API ルーティング
+app.use('/api', accountRoutes);
+
+// ヘルスチェック
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// 他にもエンドポイントを追加できます
-app.get('/hello', (req, res) => {
-  res.json({ message: 'Hello from Lambda + Express!' });
-});
-
-// Lambda 用にエクスポート
+// Lambda 用のハンドラーとしてエクスポート
 export const handler = serverless(app);
