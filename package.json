@@ -11,6 +11,7 @@
     "build": "turbo run build"
   },
   "devDependencies": {
+    "expo": "^53.0.9",
     "turbo": "^2.5.3"
   },
   "dependencies": {
