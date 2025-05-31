@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.tsx - EAS対応版
+// src/screens/HomeScreen.tsx - 改善版
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, 
@@ -9,10 +9,13 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  Platform
+  Platform,
+  Animated,
+  Dimensions,
+  PanResponder
 } from 'react-native';
 
-// 🗺️ Expo用のマップコンポーネント
+// Expo用のマップコンポーネント
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
@@ -29,15 +32,44 @@ import {
   StyleUtils 
 } from '../styles/GlobalStyles';
 
-// 🔧 環境変数から設定を取得
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const HEADER_HEIGHT = 80;
+const HANDLE_HEIGHT = 40;
+const POSTS_HEADER_HEIGHT = 60;
+const TAB_BAR_HEIGHT = 60; // タブバーの高さを追加
+
+// パネルの最小・最大高さ
+const MIN_PANEL_HEIGHT = SCREEN_HEIGHT * 0.3; // 画面の30%
+const MAX_PANEL_HEIGHT = SCREEN_HEIGHT - HEADER_HEIGHT - TAB_BAR_HEIGHT - 20; // タブバーを考慮
+
+// パネル状態の定義
+enum PanelState {
+  COLLAPSED = 'COLLAPSED', // 最小
+  HALF = 'HALF',          // 中間
+  EXPANDED = 'EXPANDED'    // 最大
+}
+
+// 各状態の高さを計算
+const getPanelHeight = (state: PanelState): number => {
+  switch (state) {
+    case PanelState.COLLAPSED:
+      return MIN_PANEL_HEIGHT;
+    case PanelState.HALF:
+      return SCREEN_HEIGHT * 0.5; // 画面の50%
+    case PanelState.EXPANDED:
+      return MAX_PANEL_HEIGHT;
+    default:
+      return MIN_PANEL_HEIGHT;
+  }
+};
+
+// 環境変数から設定を取得
 const getConfigValue = (key: string, defaultValue: string = ''): string => {
-  // EAS Build時はConstants.expoConfig.extraから取得
   const expoConfigValue = Constants.expoConfig?.extra?.[key];
   if (expoConfigValue) {
     return expoConfigValue;
   }
   
-  // 開発時はprocess.envから取得
   if (typeof process !== 'undefined' && process.env) {
     const envValue = process.env[`EXPO_PUBLIC_${key.toUpperCase()}`];
     if (envValue) {
@@ -48,31 +80,13 @@ const getConfigValue = (key: string, defaultValue: string = ''): string => {
   return defaultValue;
 };
 
-// 🌍 アプリ設定
+// アプリ設定
 const AppConfig = {
   googleMapsApiKey: getConfigValue('googleMapsApiKey'),
   apiBaseUrl: getConfigValue('apiBaseUrl', 'http://localhost:3000'),
   environment: getConfigValue('environment', 'development'),
   debugMode: getConfigValue('debugMode', 'false') === 'true',
 };
-
-// 🚨 開発時のAPIキー確認
-if (__DEV__ && !AppConfig.googleMapsApiKey) {
-  console.warn(
-    '⚠️ Google Maps APIキーが設定されていません。\n' +
-    '.envファイルでEXPO_PUBLIC_GOOGLE_MAPS_API_KEYを設定してください。'
-  );
-}
-
-// デバッグログ出力
-if (AppConfig.debugMode) {
-  console.log('🔧 App Config:', {
-    hasApiKey: !!AppConfig.googleMapsApiKey,
-    apiBaseUrl: AppConfig.apiBaseUrl,
-    environment: AppConfig.environment,
-    platform: Platform.OS,
-  });
-}
 
 // 投稿データの型定義
 interface Post {
@@ -87,52 +101,63 @@ interface Post {
   avatar?: string;
 }
 
-// サンプルデータ（東京周辺）
+// サンプルデータ（大阪周辺）
 const samplePosts: Post[] = [
   {
     id: '1',
-    username: 'Yuki_Tokyo',
-    content: '渋谷のカフェで素敵なラテアートを発見！☕️',
+    username: 'Osaka_Walker',
+    content: '梅田のカフェで美味しいコーヒーを発見しました！',
     timestamp: '2分前',
-    latitude: 35.6598,
-    longitude: 139.7006,
+    latitude: 34.7024,
+    longitude: 135.4959,
     likes: 12,
     distance: 50,
     avatar: 'https://i.pravatar.cc/50?img=1'
   },
   {
     id: '2', 
-    username: 'TechLover',
-    content: '新宿のプログラミングイベントに参加中！みんなも来て〜',
+    username: 'TechOsaka',
+    content: '難波でプログラミング勉強会開催中です。みなさんもぜひ！',
     timestamp: '5分前',
-    latitude: 35.6938,
-    longitude: 139.7036,
+    latitude: 34.6660,
+    longitude: 135.5007,
     likes: 8,
     distance: 120,
     avatar: 'https://i.pravatar.cc/50?img=2'
   },
   {
     id: '3',
-    username: 'FoodieTokyo',
-    content: '原宿で見つけた絶品たい焼き🐟 行列ができる理由がわかった！',
+    username: 'FoodieDotombori',
+    content: '道頓堀でたこ焼きの食べ比べ中です。どれも美味しい！',
     timestamp: '10分前',
-    latitude: 35.6702,
-    longitude: 139.7016,
+    latitude: 34.6690,
+    longitude: 135.5037,
     likes: 25,
     distance: 200,
     avatar: 'https://i.pravatar.cc/50?img=3'
   },
   {
     id: '4',
-    username: 'NatureWalker',
-    content: '代々木公園でお花見🌸 桜が満開で美しい！',
+    username: 'ParkLover',
+    content: '大阪城公園で桜が綺麗に咲いています。見頃です！',
     timestamp: '15分前',
-    latitude: 35.6732,
-    longitude: 139.6958,
+    latitude: 34.6873,
+    longitude: 135.5262,
     likes: 18,
     distance: 350,
     avatar: 'https://i.pravatar.cc/50?img=4'
-  }
+  },
+  {
+    id: '5',
+    username: 'CafeHunter',
+    content: '心斎橋の隠れ家カフェで絶品スイーツ発見！',
+    timestamp: '20分前',
+    latitude: 34.6751,
+    longitude: 135.5025,
+    likes: 31,
+    distance: 420,
+    avatar: 'https://i.pravatar.cc/50?img=5'
+  },
 ];
 
 export default function HomeScreen() {
@@ -141,32 +166,88 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasLocationPermission, setHasLocationPermission] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [panelState, setPanelState] = useState<PanelState>(PanelState.HALF);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null); // 選択されたユーザー
+  const [filteredPosts, setFilteredPosts] = useState<Post[]>(samplePosts); // フィルタされた投稿
+  const [isTransitioning, setIsTransitioning] = useState(false); // トランジション状態
+  
   const mapRef = useRef<MapView>(null);
-  const checkApiHealth = async () => {
-    try {
-      const res = await fetch(`${AppConfig.apiBaseUrl}/health`);
-      const data = await res.json();
-      if (AppConfig.debugMode) {
-        console.log('✅ APIヘルスチェック成功:', data);
-      }
-    } catch (err) {
-      console.error('❌ APIヘルスチェック失敗:', err);
-      Alert.alert('API接続エラー', 'バックエンドサーバーが起動していない可能性があります。');
-    }
+  const panelAnimation = useRef(new Animated.Value(getPanelHeight(PanelState.HALF))).current;
+  
+  // パンレスポンダーの設定
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        const { dy, dx } = gestureState;
+        // 縦方向の動きが横方向より大きい場合にパンを開始
+        return Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10;
+      },
+      onPanResponderGrant: () => {
+        // パン開始時に現在の値を設定
+        panelAnimation.setOffset(panelAnimation._value);
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // 逆方向の動き（上に引っ張ると値が増える）
+        panelAnimation.setValue(-gestureState.dy);
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        panelAnimation.flattenOffset();
+        
+        const { dy, vy } = gestureState;
+        const currentHeight = panelAnimation._value;
+        
+        let targetState = panelState;
+        
+        // 速度による判定
+        if (Math.abs(vy) > 0.5) {
+          if (vy < 0) {
+            // 上方向の勢い
+            targetState = panelState === PanelState.COLLAPSED ? PanelState.HALF : PanelState.EXPANDED;
+          } else {
+            // 下方向の勢い
+            targetState = panelState === PanelState.EXPANDED ? PanelState.HALF : PanelState.COLLAPSED;
+          }
+        } else {
+          // 距離による判定
+          const threshold = 50;
+          if (dy < -threshold) {
+            // 上に移動
+            targetState = panelState === PanelState.COLLAPSED ? PanelState.HALF : PanelState.EXPANDED;
+          } else if (dy > threshold) {
+            // 下に移動
+            targetState = panelState === PanelState.EXPANDED ? PanelState.HALF : PanelState.COLLAPSED;
+          }
+        }
+        
+        animateToState(targetState);
+      },
+    })
+  ).current;
+
+  // 指定状態にアニメーション
+  const animateToState = (newState: PanelState) => {
+    const toValue = getPanelHeight(newState);
+    
+    Animated.spring(panelAnimation, {
+      toValue,
+      useNativeDriver: false,
+      tension: 100,
+      friction: 8,
+    }).start(() => {
+      setPanelState(newState);
+    });
   };
 
   useEffect(() => {
     initializeApp();
   }, []);
 
-  // 🚀 アプリ初期化
+  // アプリ初期化
   const initializeApp = async () => {
     try {
       if (AppConfig.debugMode) {
         console.log('🚀 アプリを初期化中...');
       }
-
-      await checkApiHealth();
       await requestLocationPermission();
     } catch (error) {
       console.error('アプリ初期化エラー:', error);
@@ -174,43 +255,23 @@ export default function HomeScreen() {
       setIsLoading(false);
     }
   };
-  useEffect(() => {
-    const checkApi = async () => {
-      try {
-        const res = await fetch(`${AppConfig.apiBaseUrl}/health`);
-        const data = await res.json();
-        if (AppConfig.debugMode) {
-          Alert.alert('✅ API 通信成功', `status: ${data.status}`);
-        }
-      } catch (err) {
-        Alert.alert('❌ API通信失敗', 'バックエンドサーバーが落ちている可能性があります。');
-      }
-    };
-    checkApi();
-  }, []);
 
-  // 🔐 位置情報の権限を要求
+  // 位置情報の権限を要求
   const requestLocationPermission = async () => {
     try {
-      if (AppConfig.debugMode) {
-        console.log('🔐 位置情報の権限を要求中...');
-      }
-      
-      // Expo Location を使用して権限を要求
       let { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        console.log('❌ 位置情報の権限が拒否されました');
         Alert.alert(
           '位置情報の権限が必要です',
-          'このアプリでは周辺の投稿を表示するために位置情報が必要です。設定から位置情報を許可してください。',
+          'このアプリでは周辺の投稿を表示するために位置情報が必要です。',
           [
             { 
               text: 'デフォルト位置を使用', 
               onPress: () => {
                 setUserLocation({
-                  latitude: 35.6812,
-                  longitude: 139.7671
+                  latitude: 34.7024, // 大阪梅田
+                  longitude: 135.4959
                 });
                 setIsLoading(false);
               }
@@ -224,40 +285,28 @@ export default function HomeScreen() {
         return;
       }
 
-      if (AppConfig.debugMode) {
-        console.log('✅ 位置情報の権限が許可されました');
-      }
-      
       setHasLocationPermission(true);
       await getCurrentLocation();
       
     } catch (error) {
-      console.error('❌ 権限要求エラー:', error);
+      console.error('権限要求エラー:', error);
       Alert.alert('エラー', '位置情報の権限取得に失敗しました。デフォルト位置を使用します。');
       setUserLocation({
-        latitude: 35.6812,
-        longitude: 139.7671
+        latitude: 34.7024, // 大阪梅田
+        longitude: 135.4959
       });
       setIsLoading(false);
     }
   };
 
-  // 📍 現在位置を取得
+  // 現在位置を取得
   const getCurrentLocation = async () => {
     try {
-      if (AppConfig.debugMode) {
-        console.log('📍 現在位置を取得中...');
-      }
-      
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
         timeInterval: 5000,
         distanceInterval: 10,
       });
-      
-      if (AppConfig.debugMode) {
-        console.log('✅ 位置情報取得成功:', location.coords);
-      }
       
       setUserLocation({
         latitude: location.coords.latitude,
@@ -266,335 +315,524 @@ export default function HomeScreen() {
       setIsLoading(false);
       
     } catch (error) {
-      console.error('❌ 現在位置取得エラー:', error);
+      console.error('現在位置取得エラー:', error);
       Alert.alert(
         '位置情報取得エラー',
-        'デフォルト位置（茨木駅）を使用します。GPS設定を確認してください。',
+        'デフォルト位置（大阪梅田）を使用します。',
         [{ text: 'OK' }]
       );
       
-      // デフォルト位置（東京駅）
       setUserLocation({
-        latitude: 34.815206,
-        longitude: 135.562543
+        latitude: 34.7024, // 大阪梅田
+        longitude: 135.4959
       });
       setIsLoading(false);
     }
   };
 
-  // 🔄 位置情報を再取得
-  const refreshLocation = async () => {
-    setIsLoading(true);
-    setError(null);
+  // マーカータップ時の処理
+  const handleMarkerPress = (post: Post) => {
+    console.log(`マーカータップ: ${post.username}`);
     
-    if (hasLocationPermission) {
-      await getCurrentLocation();
-    } else {
-      await requestLocationPermission();
-    }
-  };
-
-  // 🗺 地図上の位置に移動
-  const moveToLocation = (latitude: number, longitude: number) => {
+    // 選択されたユーザーの投稿のみをフィルタ
+    const userPosts = posts.filter(p => p.username === post.username);
+    setFilteredPosts(userPosts);
+    setSelectedUser(post.username);
+    
+    // パネルを半分の大きさに設定
+    animateToState(PanelState.HALF);
+    
+    // マップを該当位置に移動
     if (mapRef.current) {
       mapRef.current.animateToRegion({
-        latitude,
-        longitude,
+        latitude: post.latitude,
+        longitude: post.longitude,
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       }, 1000);
     }
   };
 
-  // 📲 投稿を取得（将来的にAPIから取得）
-  const fetchPosts = async () => {
-    try {
-      if (AppConfig.debugMode) {
-        console.log('📲 投稿を取得中...', AppConfig.apiBaseUrl);
-      }
-      
-      // 将来的にはAPIから取得
-      // const response = await fetch(`${AppConfig.apiBaseUrl}/api/posts/nearby`);
-      // const data = await response.json();
-      // setPosts(data);
-      
-      // 現在はサンプルデータを使用
-      setPosts(samplePosts);
-      
-    } catch (error) {
-      console.error('投稿取得エラー:', error);
-      if (AppConfig.debugMode) {
-        Alert.alert('デバッグ', `投稿取得エラー: ${error}`);
-      }
-    }
+  // フィルタをクリアして全投稿を表示
+  const clearFilter = () => {
+    setIsTransitioning(true);
+    setFilteredPosts(posts);
+    
+    // 滑らかなトランジションのため段階的に更新
+    setTimeout(() => {
+      setSelectedUser(null);
+    }, 150);
+    
+    setTimeout(() => {
+      setIsTransitioning(false);
+    }, 300);
   };
 
-  // 📝 投稿アイテムレンダリング
+  // 地図上の位置に移動
+  const moveToLocation = (latitude: number, longitude: number) => {
+    // パネルを縮小してマップを見やすくする
+    if (panelState === PanelState.EXPANDED) {
+      animateToState(PanelState.HALF);
+    }
+    
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 1000);
+      }
+    }, panelState === PanelState.EXPANDED ? 300 : 0);
+  };
+
+  // 投稿アイテムレンダリング
   const renderPost = ({ item }: { item: Post }) => (
-    <View style={[GlobalStyles.card, styles.postContainer]}>
-      <View style={[GlobalStyles.listItem, styles.postHeader]}>
-        <Image 
-          source={{ uri: item.avatar || 'https://i.pravatar.cc/50?img=5' }}
-          style={GlobalStyles.avatar}
-        />
+    <View style={styles.postCard}>
+      <View style={styles.postHeader}>
+        <View style={styles.avatarContainer}>
+          <Image 
+            source={{ uri: item.avatar || 'https://i.pravatar.cc/50?img=5' }}
+            style={styles.avatar}
+          />
+          <View style={styles.onlineIndicator} />
+        </View>
         <View style={styles.postInfo}>
-          <Text style={[GlobalStyles.textBody, StyleUtils.textColor('textPrimary')]}>
-            {item.username}
-          </Text>
-          <Text style={[GlobalStyles.textCaption, StyleUtils.textColor('textSecondary')]}>
-            {item.timestamp} • {item.distance}m
-          </Text>
+          <Text style={styles.username}>{item.username}</Text>
+          <Text style={styles.timestamp}>{item.timestamp} • {item.distance}m</Text>
         </View>
         <TouchableOpacity style={styles.moreButton}>
           <Ionicons name="ellipsis-horizontal" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
       
-      <Text style={[GlobalStyles.textBody, StyleUtils.marginVertical('sm')]}>
-        {item.content}
-      </Text>
+      <Text style={styles.postContent}>{item.content}</Text>
       
-      <View style={[styles.postActions, StyleUtils.paddingVertical('sm')]}>
+      <View style={styles.postActions}>
         <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="heart-outline" size={20} color={Colors.textSecondary} />
-          <Text style={[GlobalStyles.textCaption, StyleUtils.marginHorizontal('xs')]}>
-            {item.likes}
-          </Text>
+          <View style={[styles.actionIcon, { backgroundColor: Colors.error }]}>
+            <Ionicons name="heart-outline" size={16} color={Colors.textWhite} />
+          </View>
+          <Text style={styles.actionText}>{item.likes}</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
-          <Text style={[GlobalStyles.textCaption, StyleUtils.marginHorizontal('xs')]}>
-            返信
-          </Text>
+          <View style={[styles.actionIcon, { backgroundColor: Colors.info }]}>
+            <Ionicons name="chatbubble-outline" size={16} color={Colors.textWhite} />
+          </View>
+          <Text style={styles.actionText}>返信</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => moveToLocation(item.latitude, item.longitude)}
         >
-          <Ionicons name="location-outline" size={20} color={Colors.primary} />
-          <Text style={[GlobalStyles.textCaption, StyleUtils.marginHorizontal('xs'), { color: Colors.primary }]}>
-            位置
-          </Text>
+          <View style={[styles.actionIcon, { backgroundColor: Colors.primary }]}>
+            <Ionicons name="location-outline" size={16} color={Colors.textWhite} />
+          </View>
+          <Text style={styles.actionText}>位置</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // 🔄 ローディング画面
+  // パネル状態に応じたヒントテキスト
+  const getSwipeHint = (): string => {
+    switch (panelState) {
+      case PanelState.COLLAPSED:
+        return '上にスワイプして展開';
+      case PanelState.HALF:
+        return '上下にスワイプして調整';
+      case PanelState.EXPANDED:
+        return '下にスワイプして縮小';
+      default:
+        return '';
+    }
+  };
+
+  // ローディング画面
   if (isLoading) {
     return (
-      <View style={GlobalStyles.loadingContainer}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={GlobalStyles.loadingText}>
+        <Text style={styles.loadingText}>
           {hasLocationPermission ? '位置情報を取得中...' : '権限を確認中...'}
         </Text>
-        {AppConfig.debugMode && (
-          <Text style={[GlobalStyles.textCaption, StyleUtils.marginVertical('sm')]}>
-            環境: {AppConfig.environment}
-          </Text>
-        )}
       </View>
     );
   }
 
-  // ❌ エラー画面
+  // エラー画面
   if (error) {
     return (
-      <View style={GlobalStyles.centerContainer}>
+      <View style={styles.errorContainer}>
         <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
-        <Text style={[GlobalStyles.textHeading, StyleUtils.textColor('error')]}>
-          エラーが発生しました
-        </Text>
-        <Text style={[GlobalStyles.textBody, StyleUtils.marginVertical('sm')]}>
-          {error}
-        </Text>
-        <TouchableOpacity 
-          style={[GlobalStyles.buttonPrimary, StyleUtils.marginVertical('md')]}
-          onPress={initializeApp}
-        >
-          <Text style={GlobalStyles.buttonTextPrimary}>再試行</Text>
+        <Text style={styles.errorTitle}>エラーが発生しました</Text>
+        <Text style={styles.errorMessage}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={initializeApp}>
+          <Text style={styles.retryButtonText}>再試行</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={GlobalStyles.container}>
-      {/* 📱 ヘッダー */}
-      <View style={GlobalStyles.header}>
-        <Text style={GlobalStyles.headerTitle}>
-          Balloon
-          {AppConfig.debugMode && (
-            <Text style={[GlobalStyles.textCaption, { color: Colors.warning }]}>
-              {' '}({AppConfig.environment})
-            </Text>
-          )}
-        </Text>
-        <TouchableOpacity style={styles.headerButton}>
-          <Ionicons name="add-circle-outline" size={28} color={Colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* 🗺 マップ部分 */}
-      <View style={styles.mapContainer}>
-        {userLocation ? (
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            initialRegion={{
-              latitude: userLocation.latitude,
-              longitude: userLocation.longitude,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-            showsUserLocation={hasLocationPermission}
-            showsMyLocationButton={false}
-            showsCompass={true}
-            showsScale={true}
-            onMapReady={() => {
-              if (AppConfig.debugMode) {
-                console.log('🗺️ マップの準備が完了しました');
-              }
+    <View style={styles.container}>
+      {/* ヘッダー */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Balloon</Text>
+            {AppConfig.debugMode && (
+              <Text style={styles.debugBadge}>{AppConfig.environment}</Text>
+            )}
+          </View>
+          {/*<TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => {
+              // TODO: 新しい投稿作成画面へのナビゲーション
+              Alert.alert('新しい投稿', '投稿作成機能は実装予定です');
             }}
           >
-            {/* 📍 ユーザーの現在位置マーカー（権限がない場合のみ表示） */}
-            {!hasLocationPermission && (
-              <Marker
-                coordinate={userLocation}
-                title="デフォルト位置"
-                description="東京駅周辺"
-                pinColor={Colors.primary}
-              />
-            )}
+            <View style={styles.addButtonInner}>
+              <Ionicons name="add" size={24} color={Colors.textWhite} />
+            </View>
+          </TouchableOpacity>*/}
+        </View>
+      </View>
+
+      {/* マップ部分 */}
+      <View style={styles.mapWrapper}>
+        <Animated.View 
+          style={[
+            styles.mapContainer,
+            {
+              height: Animated.subtract(
+                SCREEN_HEIGHT - HEADER_HEIGHT,
+                panelAnimation
+              )
+            }
+          ]}
+        >
+          {userLocation ? (
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={{
+                latitude: userLocation.latitude,
+                longitude: userLocation.longitude,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+              }}
+              showsUserLocation={hasLocationPermission}
+              showsMyLocationButton={false}
+              showsCompass={true}
+            >
+              {/* デフォルト位置のマーカー */}
+              {!hasLocationPermission && (
+                <Marker
+                  coordinate={userLocation}
+                  title="デフォルト位置"
+                  description="大阪梅田"
+                  pinColor={Colors.primary}
+                />
+              )}
+              
+              {/* 投稿のマーカー */}
+              {posts.map((post) => {
+                const isSelected = selectedUser === post.username;
+                return (
+                  <Marker
+                    key={`${post.id}-${isSelected}`} // keyにselected状態を含める
+                    coordinate={{
+                      latitude: post.latitude,
+                      longitude: post.longitude,
+                    }}
+                    title={post.username}
+                    description={post.content.substring(0, 50) + '...'}
+                    onPress={() => handleMarkerPress(post)}
+                    tracksViewChanges={false} // 不要な再レンダリングを防ぐ
+                  >
+                    <View style={[
+                      styles.customMarker,
+                      isSelected && styles.selectedMarker
+                    ]}>
+                      <Image 
+                        source={{ uri: post.avatar || 'https://i.pravatar.cc/30?img=5' }}
+                        style={styles.markerAvatar}
+                      />
+                    </View>
+                  </Marker>
+                );
+              })}
+            </MapView>
+          ) : (
+            <View style={styles.mapPlaceholder}>
+              <Ionicons name="location-outline" size={48} color={Colors.textTertiary} />
+              <Text style={styles.mapPlaceholderText}>位置情報を取得できませんでした</Text>
+            </View>
+          )}
+          
+          {/* フローティングボタン（横並び） */}
+          <View style={styles.floatingButtonContainer}>
+            <TouchableOpacity 
+              style={[styles.floatingButton, styles.refreshButton]} 
+              onPress={() => getCurrentLocation()}
+            >
+              <View style={styles.floatingButtonInner}>
+                <Ionicons name="refresh" size={20} color={Colors.textWhite} />
+              </View>
+            </TouchableOpacity>
             
-            {/* 📝 投稿のマーカー */}
-            {posts.map((post) => (
-              <Marker
-                key={post.id}
-                coordinate={{
-                  latitude: post.latitude,
-                  longitude: post.longitude,
-                }}
-                title={post.username}
-                description={post.content.substring(0, 50) + '...'}
+            {userLocation && (
+              <TouchableOpacity 
+                style={[styles.floatingButton, styles.myLocationButton]}
                 onPress={() => {
-                  if (AppConfig.debugMode) {
-                    console.log(`📍 投稿 ${post.id} がタップされました`);
+                  if (mapRef.current && userLocation) {
+                    mapRef.current.animateToRegion({
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                      latitudeDelta: 0.02,
+                      longitudeDelta: 0.02,
+                    }, 1000);
                   }
                 }}
               >
-                <View style={styles.customMarker}>
-                  <Image 
-                    source={{ uri: post.avatar || 'https://i.pravatar.cc/30?img=5' }}
-                    style={styles.markerAvatar}
-                  />
+                <View style={styles.myLocationButtonInner}>
+                  <Ionicons name="navigate" size={20} color={Colors.primary} />
                 </View>
-              </Marker>
-            ))}
-          </MapView>
-        ) : (
-          <View style={[GlobalStyles.centerContainer, { backgroundColor: Colors.surface }]}>
-            <Ionicons name="location-outline" size={48} color={Colors.textTertiary} />
-            <Text style={[GlobalStyles.textBody, StyleUtils.textColor('textSecondary')]}>
-              位置情報を取得できませんでした
-            </Text>
-            <TouchableOpacity 
-              style={[GlobalStyles.buttonPrimary, StyleUtils.marginVertical('md')]}
-              onPress={refreshLocation}
-            >
-              <Text style={GlobalStyles.buttonTextPrimary}>再試行</Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-        
-        {/* 🔄 更新ボタン */}
-        <TouchableOpacity 
-          style={[GlobalStyles.buttonPrimary, styles.refreshButton]} 
-          onPress={refreshLocation}
-        >
-          <Ionicons name="refresh" size={20} color={Colors.textWhite} />
-        </TouchableOpacity>
-        
-        {/* 📍 現在位置ボタン */}
-        {userLocation && (
-          <TouchableOpacity 
-            style={[GlobalStyles.buttonSecondary, styles.myLocationButton]} 
-            onPress={() => moveToLocation(userLocation.latitude, userLocation.longitude)}
-          >
-            <Ionicons name="navigate" size={20} color={Colors.primary} />
-          </TouchableOpacity>
-        )}
+        </Animated.View>
       </View>
 
-      {/* 📝 投稿リスト部分 */}
-      <View style={[StyleUtils.backgroundColor('surface'), styles.postsContainer]}>
-        <View style={[GlobalStyles.listItem, styles.postsHeader]}>
-          <Text style={GlobalStyles.textHeading}>周辺の投稿</Text>
+      {/* スライド可能な投稿パネル */}
+      <Animated.View 
+        style={[
+          styles.postsPanel,
+          {
+            height: panelAnimation,
+          }
+        ]}
+      >
+        {/* パネルハンドル */}
+        <View style={styles.panelHandle} {...panResponder.panHandlers}>
+          <View style={styles.handleBar} />
+          <Text style={styles.swipeHint}>{getSwipeHint()}</Text>
+        </View>
+
+        {/* 投稿ヘッダー */}
+        <View style={styles.postsHeader}>
+          <View style={styles.postsHeaderLeft}>
+            <Text style={styles.postsTitle}>
+              {selectedUser ? `${selectedUser}の投稿` : '周辺の投稿'}
+            </Text>
+            <View style={styles.postsBadge}>
+              <Text style={styles.postsBadgeText}>{filteredPosts.length}</Text>
+            </View>
+            {selectedUser && (
+              <TouchableOpacity 
+                style={styles.clearFilterButton}
+                onPress={clearFilter}
+              >
+                <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
+                <Text style={styles.clearFilterText}>すべて表示</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerActionButton}>
-              <Ionicons name="filter" size={20} color={Colors.textSecondary} />
+              <Ionicons name="filter" size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.headerActionButton}
-              onPress={fetchPosts}
-            >
-              <Ionicons name="refresh" size={20} color={Colors.textSecondary} />
+            <TouchableOpacity style={[styles.headerActionButton, { marginLeft: Spacing.xs }]}>
+              <Ionicons name="refresh" size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
         
+        {/* 投稿リスト */}
         <FlatList
-          data={posts}
+          data={filteredPosts}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
           showsVerticalScrollIndicator={false}
           style={styles.postsList}
-          contentContainerStyle={{ paddingBottom: Spacing.md }}
+          contentContainerStyle={styles.postsListContent}
+          scrollEnabled={panelState !== PanelState.COLLAPSED}
         />
-      </View>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerButton: {
-    padding: Spacing.xs,
-  },
-  
-  mapContainer: {
+  container: {
     flex: 1,
-    position: 'relative',
+    backgroundColor: Colors.background,
   },
   
+  // ローディング・エラー
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.md,
+    color: Colors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    padding: Spacing.xl,
+  },
+  errorTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.error,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  errorMessage: {
+    fontSize: Typography.fontSize.md,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    ...Shadows.small,
+  },
+  retryButtonText: {
+    color: Colors.textWhite,
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+  },
+
+  // ヘッダー
+  header: {
+    height: HEADER_HEIGHT,
+    backgroundColor: Colors.primary,
+    paddingTop: Spacing.statusBarHeight,
+    ...Shadows.medium,
+    zIndex: 1000, // ヘッダーを前面に表示
+  },
+  headerContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: Colors.textWhite,
+    fontSize: Typography.fontSize.title,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  debugBadge: {
+    marginLeft: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    backgroundColor: Colors.warning,
+    borderRadius: BorderRadius.sm,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textWhite,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.round,
+    overflow: 'hidden',
+    ...Shadows.medium,
+  },
+  addButtonInner: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.secondary, // 赤い背景に変更
+    borderRadius: BorderRadius.round,
+  },
+
+  // マップ
+  mapWrapper: {
+    flex: 1,
+  },
+  mapContainer: {
+    position: 'relative',
+    backgroundColor: Colors.surface,
+  },
   map: {
     flex: 1,
   },
-  
-  refreshButton: {
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+  },
+  mapPlaceholderText: {
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.md,
+    color: Colors.textSecondary,
+  },
+
+  // フローティングボタン
+  floatingButtonContainer: {
     position: 'absolute',
     top: Spacing.sm,
     right: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 200,
+  },
+  floatingButton: {
     width: 44,
     height: 44,
     borderRadius: BorderRadius.round,
-    ...Shadows.medium,
+    marginLeft: Spacing.xs, // 横並び用の左マージン
+    ...Shadows.large,
   },
-  
+  floatingButtonInner: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.round,
+  },
+  refreshButton: {
+    // 個別の配置指定を削除
+  },
   myLocationButton: {
-    position: 'absolute',
-    top: Spacing.sm + 54, // refreshButtonの下に配置
-    right: Spacing.sm,
+    // 個別の配置指定を削除
+  },
+  myLocationButtonInner: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.round,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+  },
+
+  // カスタムマーカー
+  customMarker: {
     width: 44,
     height: 44,
     borderRadius: BorderRadius.round,
-    ...Shadows.medium,
-  },
-  
-  // 📍 カスタムマーカー
-  customMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     backgroundColor: Colors.surface,
     borderWidth: 3,
     borderColor: Colors.primary,
@@ -603,63 +841,213 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Shadows.medium,
   },
-  
+  selectedMarker: {
+    borderColor: Colors.secondary,
+    borderWidth: 4,
+    // transform を削除してスケール変更による位置ずれを防ぐ
+    ...Shadows.large,
+  },
   markerAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: BorderRadius.round,
+  },
+
+  // 投稿パネル
+  postsPanel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    ...Shadows.large,
+    // タブバーより前面に表示
+    zIndex: 100,
   },
   
-  postsContainer: {
-    flex: 1,
+  // パネルハンドル
+  panelHandle: {
+    height: HANDLE_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: Colors.divider,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.xs,
+  },
+  swipeHint: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
+    textAlign: 'center',
   },
   
+  // 投稿ヘッダー
   postsHeader: {
+    height: POSTS_HEADER_HEIGHT,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
-  
+  postsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  postsTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  postsBadge: {
+    marginLeft: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.round,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  postsBadgeText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textWhite,
+    fontWeight: Typography.fontWeight.semiBold,
+  },
+  clearFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.md,
+  },
+  clearFilterText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    marginLeft: Spacing.xs,
+    fontWeight: Typography.fontWeight.medium,
+  },
   headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
-  
   headerActionButton: {
-    padding: Spacing.xs,
-    marginLeft: Spacing.xs,
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   
+  // 投稿リスト
   postsList: {
     flex: 1,
   },
-  
-  postContainer: {
-    // GlobalStyles.cardを使用
+  postsListContent: {
+    padding: Spacing.sm,
+    paddingBottom: TAB_BAR_HEIGHT + Spacing.xl, // タブバーの高さ + 余白を追加
+  },
+
+  // 投稿カード
+  postCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    marginVertical: Spacing.xs,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    ...Shadows.small,
   },
   
+  // 投稿ヘッダー
   postHeader: {
-    borderBottomWidth: 0,
-    paddingVertical: 0,
-    paddingHorizontal: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
   },
-  
+  avatarContainer: {
+    position: 'relative',
+    marginRight: Spacing.sm,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.round,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    backgroundColor: Colors.success,
+    borderRadius: BorderRadius.round,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
   postInfo: {
     flex: 1,
   },
-  
+  username: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  timestamp: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
+  },
   moreButton: {
     padding: Spacing.xs,
+    borderRadius: BorderRadius.md,
   },
   
+  // 投稿コンテンツ
+  postContent: {
+    fontSize: Typography.fontSize.md,
+    lineHeight: Typography.fontSize.md * Typography.lineHeight.relaxed,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+  },
+  
+  // 投稿アクション
   postActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
+    paddingTop: Spacing.sm,
   },
-  
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+  },
+  actionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: BorderRadius.round,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.xs,
+  },
+  actionText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.textSecondary,
   },
 });

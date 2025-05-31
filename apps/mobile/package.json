@@ -9,23 +9,18 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    
     "build:dev": "eas build --profile development --platform all",
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:dev:android": "eas build --profile development --platform android",
-    
     "build:preview": "eas build --profile preview --platform all",
     "build:preview:ios": "eas build --profile preview --platform ios",
     "build:preview:android": "eas build --profile preview --platform android",
-    
     "build:prod": "eas build --profile production --platform all",
     "build:prod:ios": "eas build --profile production --platform ios",
     "build:prod:android": "eas build --profile production --platform android",
-    
     "submit:ios": "eas submit --platform ios",
     "submit:android": "eas submit --platform android",
     "submit:all": "eas submit --platform all",
-    
     "update:dev": "eas update --branch development",
     "update:preview": "eas update --branch preview",
     "update:prod": "eas update --branch production"
@@ -59,7 +54,8 @@
     "react-native-web": "~0.20.0",
     "react-native-webview": "^13.13.5",
     "expo-maps": "~0.10.0",
-    "react-native-maps": "1.20.1"
+    "react-native-maps": "1.20.1",
+    "expo-linear-gradient": "~14.1.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
