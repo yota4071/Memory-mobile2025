@@ -15,7 +15,7 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.100:3001
 
 apps/apiで
 
-npm run dev
+npx serverless offline
 
 のあと
 
