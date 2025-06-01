@@ -1,15 +1,13 @@
-// apps/api/src/routes/account.ts
 import express from 'express';
 import { Pool } from 'pg';
 
 const router = express.Router();
-
-// PostgreSQL接続（.env に依存）
-const pool = new Pool(); // 自動で.envから読み込み
+const pool = new Pool(); // .env からDB接続設定読み込み
 
 // POST /accounts - アカウント登録
-router.post('/example', async (req, res) => {
-  const { username } = req.body;
+router.post('/accounts', async (req, res) => {
+    console.log('受信したリクエストボディ:', req.body);
+  const { username,bio } = req.body;
 
   if (!username) {
     return res.status(400).json({ error: 'username is required' });
@@ -17,8 +15,8 @@ router.post('/example', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO example (username) VALUES ($1) RETURNING *',
-      [username]
+      'INSERT INTO accounts (username, bio) VALUES ($1, $2) RETURNING *',
+      [username, bio]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -30,7 +28,9 @@ router.post('/example', async (req, res) => {
 // GET /accounts - アカウント一覧取得
 router.get('/accounts', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM example ORDER BY created_at DESC');
+    const result = await pool.query(
+      'SELECT * FROM accounts ORDER BY created_at DESC'
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
