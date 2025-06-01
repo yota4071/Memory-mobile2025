@@ -57,6 +57,413 @@ project rootの`tagmakeforwindows.bat`
 project rootの`tag_create_for_Mac.sh`
 
 
+# Memory Mobile 2025 - セットアップガイド
+
+GPS位置情報を活用した周辺投稿SNSアプリの開発環境セットアップガイドです。
+
+## 📋 必要な環境
+
+### 必須ソフトウェア
+- **Node.js** 18.x 以上
+- **npm** 9.x 以上  
+- **Docker Desktop**
+- **Git**
+
+### 推奨ソフトウェア
+- **Visual Studio Code**
+- **Expo CLI** (グローバルインストール)
+
+## 🚀 初回セットアップ手順
+
+### 1. リポジトリのクローン
+
+```bash
+# リポジトリをクローン
+git clone <repository-url> Memory-mobile2025
+cd Memory-mobile2025
+```
+
+### 2. Docker でデータベースを起動
+
+```bash
+# Docker Desktop が起動していることを確認
+docker --version
+
+# PostgreSQL コンテナを起動
+cd apps/api
+docker-compose up -d
+
+# コンテナが起動していることを確認
+docker ps
+```
+
+期待される出力：
+```
+CONTAINER ID   IMAGE         COMMAND                  CREATED         STATUS         PORTS                    NAMES
+xxxxxxxxxxxx   postgres:15   "docker-entrypoint.s…"   X minutes ago   Up X minutes   0.0.0.0:5433->5432/tcp   api-postgres-1
+```
+
+### 3. データベーススキーマの適用
+
+```bash
+# プロジェクトルートに移動
+cd ../../
+
+# スキーマファイルをコンテナにコピー
+docker cp database/schema/complete_schema.sql api-postgres-1:/tmp/complete_schema.sql
+
+# スキーマを適用
+docker exec -it api-postgres-1 psql -U devuser -d memorydb -f /tmp/complete_schema.sql
+```
+
+### 4. データベース確認
+
+```bash
+# テーブルが正しく作成されているか確認
+docker exec -it api-postgres-1 psql -U devuser -d memorydb -c "\dt"
+```
+
+期待される出力：
+```
+                List of relations
+ Schema |   Name   | Type  |  Owner
+--------+----------+-------+---------
+ public | accounts | table | devuser
+ public | comments | table | devuser
+ public | likes    | table | devuser
+ public | posts    | table | devuser
+```
+
+### 5. APIサーバーの設定
+
+#### 5.1 依存関係のインストール
+
+```bash
+cd apps/api
+npm install
+```
+
+#### 5.2 環境変数の設定
+
+`apps/api/.env` ファイルを作成：
+
+```env
+# PostgreSQL接続設定（Docker用）
+DB_HOST=localhost
+DB_PORT=5433
+DB_NAME=memorydb
+DB_USER=devuser
+DB_PASSWORD=devpass
+
+# JWT設定
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+```
+
+#### 5.3 APIサーバーの起動
+
+```bash
+npx serverless offline
+```
+
+期待される出力：
+```
+✅ PostgreSQL（Docker）に接続しました
+Server ready: http://0.0.0.0:3001 🚀
+```
+
+### 6. モバイルアプリの設定
+
+#### 6.1 新しいターミナルを開く
+
+APIサーバーは起動したまま、新しいターミナルで以下を実行：
+
+```bash
+cd apps/mobile
+npm install
+```
+
+#### 6.2 IPアドレスの確認と設定
+
+**Windows:**
+```powershell
+ipconfig | findstr "IPv4"
+```
+
+**Mac/Linux:**
+```bash
+ifconfig | grep inet
+```
+
+出力例：
+```
+IPv4 Address. . . . . . . . . . . : 192.168.1.150
+```
+
+#### 6.3 モバイルアプリの設定変更
+
+`apps/mobile/src/contexts/AuthContext.tsx` の6行目付近を修正：
+
+```typescript
+const getApiBaseUrl = () => {
+  return 'http://192.168.1.150:3001/dev'; // ← 自分のIPアドレスに変更
+};
+```
+
+#### 6.4 モバイルアプリの起動
+
+```bash
+npm run start
+```
+
+期待される出力：
+```
+Metro waiting on exp://192.168.1.150:8081
+› Press a │ open Android
+› Press w │ open web
+```
+
+## 📱 モバイルアプリの動作確認
+
+### 1. Expo Go アプリのインストール
+
+スマートフォンに **Expo Go** アプリをインストール：
+- **iOS**: App Store から「Expo Go」をインストール
+- **Android**: Google Play Store から「Expo Go」をインストール
+
+### 2. アプリの起動
+
+1. スマートフォンとPCが**同じWiFiネットワーク**に接続されていることを確認
+2. Expo Go アプリを開く
+3. QRコードをスキャンまたは表示されたURLに接続
+
+### 3. 新規登録テスト
+
+1. アプリが起動すると認証画面が表示される
+2. 「新規登録」タブを選択
+3. 以下の情報を入力：
+   - ユーザー名: testuser123
+   - メールアドレス: test@example.com
+   - パスワード: password123
+   - 自己紹介: テストユーザーです
+4. 「アカウント作成」ボタンをタップ
+5. 成功するとメイン画面に遷移
+
+## 🛠️ 開発時の操作
+
+### APIサーバーの起動・停止
+
+```bash
+# APIサーバー起動
+cd apps/api
+npx serverless offline
+
+# 停止: Ctrl+C
+```
+
+### モバイルアプリの起動・停止
+
+```bash
+# モバイルアプリ起動
+cd apps/mobile
+npm run start
+
+# 停止: Ctrl+C
+```
+
+### データベース操作
+
+```bash
+# PostgreSQL に接続
+docker exec -it api-postgres-1 psql -U devuser -d memorydb
+
+# テーブル一覧表示
+\dt
+
+# ユーザー一覧表示
+SELECT id, username, email, created_at FROM accounts;
+
+# 終了
+\q
+```
+
+### データベースのリセット
+
+```bash
+# データベースをリセット（全データ削除）
+docker exec -it api-postgres-1 psql -U devuser -d memorydb -f /tmp/complete_schema.sql
+```
+
+## 🧪 API動作テスト（cURL）
+
+### ヘルスチェック
+
+```bash
+curl http://localhost:3001/dev/health
+```
+
+### 新規登録テスト
+
+```bash
+curl -X POST http://localhost:3001/dev/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "apitest",
+    "email": "apitest@example.com",
+    "password": "password123",
+    "bio": "API経由のテスト"
+  }'
+```
+
+### ログインテスト
+
+```bash
+curl -X POST http://localhost:3001/dev/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "apitest@example.com",
+    "password": "password123"
+  }'
+```
+
+## 🚨 トラブルシューティング
+
+### よくある問題と解決法
+
+#### 1. Docker コンテナが起動しない
+
+**エラー**: `docker: Error response from daemon`
+
+**解決法**:
+```bash
+# Docker Desktop が起動しているか確認
+# 既存のコンテナを削除してやり直し
+docker rm -f api-postgres-1
+docker-compose up -d
+```
+
+#### 2. APIサーバーが起動しない
+
+**エラー**: `bcrypt` 関連のエラー
+
+**解決法**:
+```bash
+cd apps/api
+rm -rf node_modules package-lock.json
+npm install
+```
+
+#### 3. モバイルアプリが接続できない
+
+**エラー**: "Network request failed"
+
+**解決法**:
+1. PCとスマートフォンが同じWiFiに接続されているか確認
+2. `AuthContext.tsx` のIPアドレスが正しいか確認
+3. Windows Defender ファイアウォールの設定確認
+
+#### 4. データベース接続エラー
+
+**エラー**: "column does not exist"
+
+**解決法**:
+```bash
+# スキーマを再適用
+docker exec -it api-postgres-1 psql -U devuser -d memorydb -f /tmp/complete_schema.sql
+```
+
+## 📊 プロジェクト構造
+
+```
+Memory-mobile2025/
+├── apps/
+│   ├── mobile/              # React Native モバイルアプリ
+│   │   ├── src/
+│   │   │   ├── contexts/    # 認証コンテキスト
+│   │   │   ├── screens/     # 画面コンポーネント
+│   │   │   └── styles/      # スタイル定義
+│   │   └── app/             # ルーティング
+│   └── api/                 # Node.js APIサーバー
+│       ├── src/
+│       │   ├── routes/      # APIルート
+│       │   └── index.ts     # メインファイル
+│       └── .env             # 環境変数
+├── database/
+│   └── schema/
+│       └── complete_schema.sql  # データベーススキーマ
+└── README.md
+```
+
+## 🎯 利用可能な機能
+
+### 現在実装済み
+- ✅ ユーザー新規登録
+- ✅ ログイン・ログアウト
+- ✅ JWT認証
+- ✅ パスワードハッシュ化
+- ✅ 基本的なバリデーション
+
+### 今後実装予定
+- 📍 GPS位置情報取得
+- 📝 投稿機能
+- 🗺️ 地図表示
+- ❤️ いいね機能
+- 💬 コメント機能
+
+## 🔗 API エンドポイント
+
+| 機能 | メソッド | エンドポイント |
+|------|----------|----------------|
+| ヘルスチェック | GET | `/dev/health` |
+| 新規登録 | POST | `/dev/api/auth/register` |
+| ログイン | POST | `/dev/api/auth/login` |
+| ユーザー情報取得 | GET | `/dev/api/auth/me` |
+
+## 👥 チーム開発時の注意点
+
+### 1. 環境変数は共有しない
+- `.env` ファイルは `.gitignore` に含まれています
+- 各自が自分のIPアドレスを設定してください
+
+### 2. データベースの状態
+- 開発中はローカルのDockerコンテナを使用
+- データは各自のローカル環境のみに保存されます
+
+### 3. ポート番号
+- API: 3001番ポート
+- PostgreSQL: 5433番ポート
+- Expo: 8081番ポート
+
+### 4. Git での協業
+```bash
+# 作業前に最新状態を取得
+git pull origin main
+
+# 新しいブランチで作業
+git checkout -b feature/新機能名
+
+# 作業完了後
+git add .
+git commit -m "機能: 新機能の説明"
+git push origin feature/新機能名
+```
+
+## 📞 サポート
+
+質問や問題が発生した場合は、以下の情報と一緒にチームメンバーに連絡してください：
+
+1. **エラーメッセージ** (完全なログ)
+2. **実行した手順**
+3. **環境情報** (OS、Node.jsバージョンなど)
+4. **スクリーンショット** (必要に応じて)
+
+---
+
+**🎉 セットアップ完了！** 
+
+開発環境が正しく構築されていれば、認証機能付きのモバイルアプリが動作するはずです。何か問題があれば、上記のトラブルシューティングを参考にしてください。
+
+
+
 
 # grobalなcss(ts)の場所
 基本的にreact nativeではcssは使えないのでそれ用のtsを用意しました。**apps/mobile/src/styles**に入っています
