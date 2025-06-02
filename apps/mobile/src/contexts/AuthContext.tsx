@@ -68,55 +68,83 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // トークンの有効性を確認
-  const verifyToken = async (authToken: string) => {
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/api/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+  // // トークンの有効性を確認
+  // const verifyToken = async (authToken: string) => {
+  //   try {
+  //     const response = await fetch(`${getApiBaseUrl()}/api/auth/me`, {
+  //       headers: {
+  //         'Authorization': `Bearer ${authToken}`,
+  //         'Content-Type': 'application/json',
+  //       },
+  //     });
 
-      if (!response.ok) {
-        throw new Error('Token verification failed');
-      }
+  //     if (!response.ok) {
+  //       throw new Error('Token verification failed');
+  //     }
 
-      const data = await response.json();
-      if (data.success) {
-        setUser(data.user);
-        await AsyncStorage.setItem(USER_KEY, JSON.stringify(data.user));
-      }
-    } catch (error) {
-      console.error('トークン確認エラー:', error);
-      await clearAuthData();
-    }
+  //     const data = await response.json();
+  //     if (data.success) {
+  //       setUser(data.user);
+  //       await AsyncStorage.setItem(USER_KEY, JSON.stringify(data.user));
+  //     }
+  //   } catch (error) {
+  //     console.error('トークン確認エラー:', error);
+  //     await clearAuthData();
+  //   }
+  // };
+  // これが、フロントの認証をスキップするダミー認証です
+const verifyToken = async (authToken: string) => {
+  // 検証をスキップして成功扱いにする
+  const dummyUser = {
+    id: 1,
+    username: 'GuestUser',
+    email: 'guest@example.com',
+    bio: 'Guest',
+    createdAt: new Date().toISOString()
   };
-
-  // ログイン
-  const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        await setAuthData(data.token, data.user);
-        return { success: true, message: data.message };
-      } else {
-        return { success: false, message: data.message || 'ログインに失敗しました' };
-      }
-    } catch (error) {
-      console.error('ログインエラー:', error);
-      return { success: false, message: 'ネットワークエラーが発生しました' };
-    }
+  setUser(dummyUser);
+  await AsyncStorage.setItem(USER_KEY, JSON.stringify(dummyUser));
+};
+// ログイン（フロントだけで成功させるモック版）
+const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
+  const dummyUser = {
+    id: 1,
+    username: 'GuestUser',
+    email,
+    bio: 'ゲストユーザー',
+    createdAt: new Date().toISOString(),
   };
+  const dummyToken = 'dummy-token';
+
+  await setAuthData(dummyToken, dummyUser);
+
+  return { success: true, message: 'ログイン成功（モック）' };
+};
+
+  // // ログイン
+  // const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
+  //   try {
+  //     const response = await fetch(`${getApiBaseUrl()}/api/auth/login`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ email, password }),
+  //     });
+
+  //     const data = await response.json();
+
+  //     if (response.ok && data.success) {
+  //       await setAuthData(data.token, data.user);
+  //       return { success: true, message: data.message };
+  //     } else {
+  //       return { success: false, message: data.message || 'ログインに失敗しました' };
+  //     }
+  //   } catch (error) {
+  //     console.error('ログインエラー:', error);
+  //     return { success: false, message: 'ネットワークエラーが発生しました' };
+  //   }
+  // };
 
   // 新規登録
   const register = async (username: string, email: string, password: string, bio?: string): Promise<{ success: boolean; message: string }> => {

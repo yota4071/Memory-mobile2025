@@ -1,5 +1,7 @@
 import express from 'express';
 import { Pool } from 'pg';
+import dotenv from 'dotenv';
+dotenv.config(); // ← .env を読み込む
 
 const router = express.Router();
 const pool = new Pool(); // .env からDB接続設定読み込み
@@ -15,7 +17,7 @@ router.post('/accounts', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO accounts (username, bio) VALUES ($1, $2) RETURNING *',
+      'INSERT INTO example (username, bio) VALUES ($1, $2) RETURNING *',
       [username, bio]
     );
     res.status(201).json(result.rows[0]);
@@ -29,7 +31,7 @@ router.post('/accounts', async (req, res) => {
 router.get('/accounts', async (_req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM accounts ORDER BY created_at DESC'
+      'SELECT * FROM example ORDER BY created_at DESC'
     );
     res.json(result.rows);
   } catch (err) {
