@@ -83,6 +83,11 @@ git clone <repository-url> Memory-mobile2025
 cd Memory-mobile2025
 ```
 
+了解です！
+WSL＋Windows環境でDockerが起動しないケースに備えて、Docker Desktopの設定でUbuntuやDebian（WSLディストリビューション）を有効にする案内を追記した文章例を作りました。
+
+---
+
 ### 2. Docker でデータベースを起動
 
 ```bash
@@ -98,10 +103,29 @@ docker ps
 ```
 
 期待される出力：
+
 ```
 CONTAINER ID   IMAGE         COMMAND                  CREATED         STATUS         PORTS                    NAMES
 xxxxxxxxxxxx   postgres:15   "docker-entrypoint.s…"   X minutes ago   Up X minutes   0.0.0.0:5433->5432/tcp   api-postgres-1
 ```
+
+---
+
+#### 【補足】WSL＋Windows環境でDockerが起動しない場合
+
+WSL（Windows Subsystem for Linux）を利用している場合、Docker Desktopの設定で使用するWSLディストリビューション（例：UbuntuやDebian）が有効になっているか確認してください。
+有効になっていないとDockerが起動しなかったり、コンテナが正常に動作しないことがあります。
+
+**設定手順（Docker Desktopの場合）**
+
+1. Docker Desktopを開く
+2. 左メニューから「Resources」→「WSL INTEGRATION」を選択
+3. 利用しているWSLディストリビューション（例：Ubuntu、Debian）にチェックを入れて有効化する
+4. 設定を保存し、Docker Desktopを再起動する
+
+この設定を行うことで、WSL環境上でDockerがスムーズに動作します。
+
+---
 
 ### 3. データベーススキーマの適用
 
